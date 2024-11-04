@@ -14,7 +14,6 @@ from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
 from werkzeug.security import generate_password_hash, check_password_hash
 from bson import ObjectId
-import language_tool_python
 from spellchecker import SpellChecker
 
 # Configuração do pytesseract
@@ -38,8 +37,6 @@ db = client['meuRH']  # Nome do banco de dados
 
 app = Flask(__name__)
 CORS(app)  # Permite requisições CORS
-
-tool = language_tool_python.LanguageTool('pt')  # Define o idioma como português
 
 # Diretório onde as imagens e os resultados processados serão salvos
 SAVE_DIR = 'C:/Users/leomi/OneDrive/Área de Trabalho/Faculdade Leo/aplicativo-tcc/img'
