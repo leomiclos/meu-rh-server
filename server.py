@@ -15,10 +15,13 @@ from pymongo.server_api import ServerApi
 from werkzeug.security import generate_password_hash, check_password_hash
 from bson import ObjectId
 import language_tool_python
-
+from spellchecker import SpellChecker
 
 # Configuração do pytesseract
 pt.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+
+# Inicializa o SpellChecker para português
+spell = SpellChecker(language='pt')
 
 # Configuração do MongoDB
 uri = "mongodb+srv://leonardormiclos:leonardo2024@meurh.wddun.mongodb.net/?retryWrites=true&w=majority&appName=meuRH"
@@ -59,7 +62,6 @@ def extract_text():
         text = pt.image_to_string(img)
 
     elif file_extension == 'pdf':
-        # Especifique o caminho do Poppler se necessário
         images = convert_from_path(BytesIO(file.read()))
         text = ''
         for image in images:
@@ -69,13 +71,13 @@ def extract_text():
         return jsonify({"error": "Formato de arquivo não suportado"}), 400
 
     text = text.replace('\n', ' ')
-    matches = tool.check(text)
-    corrected_text = language_tool_python.utils.correct(text, matches)
+    corrected_text = correct_spelling(text)
 
     words = corrected_text.split()
     words_objects = [{"word": word} for word in words]
 
     course_name = extract_course_name(corrected_text)
+    training_name = extract_training_name(corrected_text)  # Extraindo nome do treinamento
     date = extract_date(corrected_text)
     duration = extract_duration_or_calculate(corrected_text)
 
@@ -83,12 +85,28 @@ def extract_text():
         "extracted_text": corrected_text,
         "words": words_objects,
         "course_name": course_name,
+        "training_name": training_name,
         "date": date,
         "duration": duration
     })
 
+def correct_spelling(text):
+    words = text.split()
+    misspelled = spell.unknown(words)
+
+    for word in misspelled:
+        corrected_word = spell.candidates(word)
+        if corrected_word:
+            text = text.replace(word, corrected_word.pop())
+
+    return text
+
 def extract_course_name(text):
     match = re.search(r'(curso\s*"?([\w\s]+)"?)', text, re.IGNORECASE)
+    return match.group(2).strip() if match else None
+
+def extract_training_name(text):
+    match = re.search(r'(treinamento\s*"?([\w\s]+)"?)', text, re.IGNORECASE)
     return match.group(2).strip() if match else None
 
 def extract_date(text):
@@ -100,14 +118,12 @@ def extract_duration_or_calculate(text):
     if duration_match:
         return duration_match.group(0)
     
-    # Extrai as datas de início e fim do período
     date_range_match = re.search(r'(\d{2}[/-]\d{2}[/-]\d{4})\s*[aà]\s*(\d{2}[/-]\d{2}[/-]\d{4})', text)
     if date_range_match:
         start_date_str, end_date_str = date_range_match.groups()
         try:
             start_date = datetime.strptime(start_date_str, '%d/%m/%Y')
             end_date = datetime.strptime(end_date_str, '%d/%m/%Y')
-            # Calcula a diferença em dias e assume 8 horas por dia
             days_difference = (end_date - start_date).days + 1
             hours = days_difference * 8  # Ajuste o valor 8 para a carga horária padrão desejada
             return f"{hours} horas (calculadas)"
@@ -120,7 +136,6 @@ def verifyIsOn():
     return "API Online"
 
 def serialize(funcionario):
-    # Converte o funcionário para um formato serializável
     return {
         'id': str(funcionario['_id']),
         'nome': funcionario['nome'],
@@ -129,7 +144,7 @@ def serialize(funcionario):
         'idade': funcionario['idade'],
         'tipo_funcionario': funcionario['tipo_funcionario'],
         'cargo': funcionario['cargo'],
-        'photo': funcionario.get('photo')  # Certifique-se de incluir a foto, se existir
+        'photo': funcionario.get('photo')
     }
 
 @app.route('/login', methods=['POST'])
@@ -143,14 +158,12 @@ def login():
         return jsonify({'error': 'Nome de usuário e senha são obrigatórios.'}), 400
 
     try:
-        # Busca o funcionário no banco de dados
         funcionario = db.funcionarios.find_one({'usuario': usuario})
-        print(f"Funcionário encontrado: {funcionario}")  # Log para ver o funcionário encontrado
+        print(f"Funcionário encontrado: {funcionario}")
 
         if funcionario:
-            # Aqui estamos passando a senha do formulário e a senha hash do banco
             if check_password_hash(funcionario['senha'], str(senha)):
-                funcionario.pop('senha', None)  # Remove a senha da resposta
+                funcionario.pop('senha', None)
                 funcionario = serialize(funcionario)
                 return jsonify({'message': 'Login bem-sucedido!', 'funcionario': funcionario}), 200
             else:
@@ -161,31 +174,24 @@ def login():
     except Exception as e:
         return jsonify({'error': f'Erro ao acessar o banco de dados: {str(e)}'}), 500
 
-
-
-
 # Rotas CRUD para Funcionários
 @app.route('/funcionarios', methods=['POST'])
 def create_funcionario():
     data = request.json
 
-    # Verificar se o usuário já existe
     usuario_existente = db.funcionarios.find_one({'usuario': data.get('usuario')})
     if usuario_existente:
         return jsonify({'error': 'Usuário já existe.'}), 400
 
-    # Criptografar a senha antes de armazenar
     senha = data.get('senha') 
- 
     senha_hash = generate_password_hash(str(senha)) 
 
-    # Preparar os dados para o banco de dados
     novo_funcionario = {
         "nome": data.get('nome'),
         "usuario": data.get('usuario'),
         "photo": data.get('photo'),
         "idade": data.get('idade'),
-        "senha": senha_hash,  # Store the hashed password
+        "senha": senha_hash,
         "email": data.get('email'),
         "salario": data.get('salario'),
         "tipo_funcionario": data.get('tipo_funcionario'),
@@ -195,7 +201,6 @@ def create_funcionario():
         }
     }
 
-    # Inserir o funcionário no banco de dados
     result = db.funcionarios.insert_one(novo_funcionario)
     return jsonify({'id': str(result.inserted_id)}), 201
 
@@ -209,13 +214,11 @@ def get_funcionario(nome):
     funcionario = db.funcionarios.find_one({'nome': nome}, {'_id': 0})
     if funcionario:
         return jsonify(funcionario), 200
-    return jsonify({'error': 'Funcionário not found'}), 404
+    return jsonify({'error': 'Funcionário não encontrado'}), 404
 
 @app.route('/funcionarios/<string:usuario>', methods=['PUT'])
 def update_funcionario(usuario):
     data = request.json
-    
-    # Atualiza o funcionário no banco de dados
     result = db.funcionarios.update_one({'usuario': usuario}, {'$set': data})
 
     if result.matched_count > 0:
@@ -228,7 +231,7 @@ def delete_funcionario(nome):
     result = db.funcionarios.delete_one({'nome': nome})
     if result.deleted_count > 0:
         return jsonify({'message': 'Funcionário deletado com sucesso'}), 200
-    return jsonify({'error': 'Funcionário not found'}), 404
+    return jsonify({'error': 'Funcionário não encontrado'}), 404
 
 # Rotas CRUD para Certificados
 @app.route('/certificados', methods=['POST'])
@@ -247,22 +250,24 @@ def get_certificado(id):
     certificado = db.certificados.find_one({'_id': ObjectId(id)}, {'_id': 0})
     if certificado:
         return jsonify(certificado), 200
-    return jsonify({'error': 'Certificado not found'}), 404
+    return jsonify({'error': 'Certificado não encontrado'}), 404
 
 @app.route('/certificados/<string:id>', methods=['PUT'])
 def update_certificado(id):
     data = request.json
     result = db.certificados.update_one({'_id': ObjectId(id)}, {'$set': data})
+
     if result.matched_count > 0:
         return jsonify({'message': 'Certificado atualizado com sucesso'}), 200
-    return jsonify({'error': 'Certificado not found'}), 404
+    
+    return jsonify({'error': 'Certificado não encontrado'}), 404
 
 @app.route('/certificados/<string:id>', methods=['DELETE'])
 def delete_certificado(id):
     result = db.certificados.delete_one({'_id': ObjectId(id)})
     if result.deleted_count > 0:
         return jsonify({'message': 'Certificado deletado com sucesso'}), 200
-    return jsonify({'error': 'Certificado not found'}), 404
+    return jsonify({'error': 'Certificado não encontrado'}), 404
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8000)
