@@ -196,12 +196,12 @@ def create_funcionario():
     senha_hash = generate_password_hash(senha)
 
     # Verificar o cargo
-    cargo_nome = data.get('nomeCargo')
+    nome_cargo = data.get('nomeCargo')
     cargo_salario = data.get('salario')
 
     # Definir valores padrão para cargo se não fornecidos
-    if not cargo_nome:
-        cargo_nome = "Não especificado"
+    if not nome_cargo:
+        nome_cargo = "Não especificado"
     if cargo_salario is None:
         cargo_salario = 0  # Ou outro valor padrão que faça sentido
 
@@ -214,7 +214,7 @@ def create_funcionario():
         "email": data.get('email'),
         "tipo_funcionario": data.get('tipo_funcionario'),
         "cargo": {
-            "nome_cargo": cargo_nome,
+            "nome_cargo": nome_cargo,
             "salario": cargo_salario
         }
     }
