@@ -135,13 +135,16 @@ def verifyIsOn():
 def serialize(funcionario):
     return {
         'id': str(funcionario['_id']),
-        'nome': funcionario['nome'],
-        'usuario': funcionario['usuario'],
-        'email': funcionario['email'],
-        'idade': funcionario['idade'],
-        'tipo_funcionario': funcionario['tipo_funcionario'],
-        'cargo': funcionario['cargo'],
-        'photo': funcionario.get('photo')
+        'nome': funcionario.get('nome', ''),
+        'usuario': funcionario.get('usuario', ''),
+        'email': funcionario.get('email', ''),
+        'idade': funcionario.get('idade', ''),
+        'tipo_funcionario': funcionario.get('tipo_funcionario', ''),
+        'cargo': {
+            'nome_cargo': funcionario.get('cargo', {}).get('nome_cargo', ''),
+            'salario': funcionario.get('cargo', {}).get('salario', '')
+        },
+        'photo': funcionario.get('photo', None)
     }
 
 @app.route('/login', methods=['POST'])
@@ -177,21 +180,28 @@ def create_funcionario():
     data = request.json
     print(data)
 
+    # Verificar se os campos obrigatórios estão presentes
+    required_fields = ['nome', 'usuario', 'senha', 'idade', 'email', 'tipo_funcionario', 'nomeCargo', 'salario']
+    for field in required_fields:
+        if field not in data:
+            return jsonify({'error': f'Campo "{field}" é obrigatório.'}), 400
+
+    # Verificar se o usuário já existe
     usuario_existente = db.funcionarios.find_one({'usuario': data.get('usuario')})
     if usuario_existente:
         return jsonify({'error': 'Usuário já existe.'}), 400
 
+    # Hashing da senha
     senha = data.get('senha') 
-    senha_hash = generate_password_hash(str(senha)) 
+    senha_hash = generate_password_hash(senha)
 
     novo_funcionario = {
         "nome": data.get('nome'),
         "usuario": data.get('usuario'),
-        "photo": data.get('photo'),
+        "photo": data.get('photo', None),  # Foto pode ser opcional
         "idade": data.get('idade'),
         "senha": senha_hash,
         "email": data.get('email'),
-        "salario": data.get('salario'),
         "tipo_funcionario": data.get('tipo_funcionario'),
         "cargo": {
             "nome_cargo": data.get('nomeCargo'),
@@ -199,8 +209,13 @@ def create_funcionario():
         }
     }
 
-    result = db.funcionarios.insert_one(novo_funcionario)
-    return jsonify({'id': str(result.inserted_id)}), 201
+    try:
+        # Inserir o novo funcionário no banco de dados
+        result = db.funcionarios.insert_one(novo_funcionario)
+        return jsonify({'id': str(result.inserted_id)}), 201
+    except Exception as e:
+        # Em caso de erro na inserção
+        return jsonify({'error': f'Erro ao criar funcionário: {str(e)}'}), 500
 
 @app.route('/funcionarios', methods=['GET'])
 def get_funcionarios():
