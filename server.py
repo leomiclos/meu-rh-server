@@ -74,7 +74,7 @@ def extract_text():
     words_objects = [{"word": word} for word in words]
 
     course_name = extract_course_name(corrected_text)
-    training_name = extract_training_name(corrected_text)  # Extraindo nome do treinamento
+    training_name = extract_training_name(corrected_text)  
     date = extract_date(corrected_text)
     duration = extract_duration_or_calculate(corrected_text)
 
@@ -175,6 +175,7 @@ def login():
 @app.route('/funcionarios', methods=['POST'])
 def create_funcionario():
     data = request.json
+    print(data)
 
     usuario_existente = db.funcionarios.find_one({'usuario': data.get('usuario')})
     if usuario_existente:
@@ -193,7 +194,7 @@ def create_funcionario():
         "salario": data.get('salario'),
         "tipo_funcionario": data.get('tipo_funcionario'),
         "cargo": {
-            "nome_cargo": data.get('nome_cargo'),
+            "nome_cargo": data.get('nomeCargo'),
             "salario": data.get('salario')
         }
     }
