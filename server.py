@@ -181,7 +181,7 @@ def create_funcionario():
     print(data)
 
     # Verificar se os campos obrigatórios estão presentes
-    required_fields = ['nome', 'usuario', 'senha', 'idade', 'email', 'tipo_funcionario', 'nomeCargo', 'salario']
+    required_fields = ['nome', 'usuario', 'idade', 'email', 'tipo_funcionario']
     for field in required_fields:
         if field not in data:
             return jsonify({'error': f'Campo "{field}" é obrigatório.'}), 400
@@ -191,9 +191,19 @@ def create_funcionario():
     if usuario_existente:
         return jsonify({'error': 'Usuário já existe.'}), 400
 
-    # Hashing da senha
-    senha = data.get('senha') 
+    # Definir a senha como "12345" para todos os novos usuários
+    senha = "12345"
     senha_hash = generate_password_hash(senha)
+
+    # Verificar o cargo
+    cargo_nome = data.get('nomeCargo')
+    cargo_salario = data.get('salario')
+
+    # Definir valores padrão para cargo se não fornecidos
+    if not cargo_nome:
+        cargo_nome = "Não especificado"
+    if cargo_salario is None:
+        cargo_salario = 0  # Ou outro valor padrão que faça sentido
 
     novo_funcionario = {
         "nome": data.get('nome'),
@@ -204,8 +214,8 @@ def create_funcionario():
         "email": data.get('email'),
         "tipo_funcionario": data.get('tipo_funcionario'),
         "cargo": {
-            "nome_cargo": data.get('nomeCargo'),
-            "salario": data.get('salario')
+            "nome_cargo": cargo_nome,
+            "salario": cargo_salario
         }
     }
 
@@ -216,6 +226,7 @@ def create_funcionario():
     except Exception as e:
         # Em caso de erro na inserção
         return jsonify({'error': f'Erro ao criar funcionário: {str(e)}'}), 500
+
 
 @app.route('/funcionarios', methods=['GET'])
 def get_funcionarios():
