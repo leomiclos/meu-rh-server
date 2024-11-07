@@ -10,8 +10,7 @@ from PIL import Image
 from pdf2image import convert_from_path
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from pymongo.mongo_client import MongoClient
-from pymongo.server_api import ServerApi
+from pymongo import MongoClient
 from werkzeug.security import generate_password_hash, check_password_hash
 from bson import ObjectId
 from spellchecker import SpellChecker
@@ -24,7 +23,7 @@ spell = SpellChecker(language='pt')
 
 # Configuração do MongoDB
 uri = "mongodb+srv://leonardormiclos:leonardo2024@meurh.wddun.mongodb.net/?retryWrites=true&w=majority&appName=meuRH"
-client = MongoClient(uri, server_api=ServerApi('1'))
+client = MongoClient(uri)
 
 # Confirmação de conexão com o MongoDB
 try:
@@ -34,7 +33,9 @@ except Exception as e:
     print(f"Erro ao conectar ao MongoDB: {e}")
 
 db = client['meuRH']  # Nome do banco de dados
+certificates_collection = db['certificates']  # Coleção de certificados
 
+# Flask Configuration
 app = Flask(__name__)
 CORS(app)  # Permite requisições CORS
 
@@ -45,12 +46,16 @@ if not os.path.exists(SAVE_DIR):
 
 @app.route('/extract-text', methods=['POST'])
 def extract_text():
+    user_id = request.form.get('user_id')
+    if not user_id:
+        return jsonify({"error": "ID do usuário é obrigatório"}), 400
+
     if 'image' not in request.files:
         return jsonify({"error": "Nenhuma imagem foi enviada"}), 400
 
     file = request.files['image']
     file_extension = file.filename.split('.')[-1].lower()
-    
+
     print(f"Recebendo arquivo: {file.filename}, extensão: {file_extension}")
 
     if file_extension in ['jpg', 'jpeg', 'png']:
@@ -74,17 +79,32 @@ def extract_text():
     words_objects = [{"word": word} for word in words]
 
     course_name = extract_course_name(corrected_text)
-    training_name = extract_training_name(corrected_text)  
+    training_name = extract_training_name(corrected_text)
     date = extract_date(corrected_text)
     duration = extract_duration_or_calculate(corrected_text)
 
+    # Salvando no banco de dados MongoDB
+    certificate_data = {
+        "user_id": user_id,
+        "extracted_text": corrected_text,
+        "course_name": course_name,
+        "training_name": training_name,
+        "date": date,
+        "duration": duration,
+        "timestamp": datetime.utcnow()
+    }
+    
+    result = certificates_collection.insert_one(certificate_data)
+
     return jsonify({
+        "message": "Certificado processado e salvo com sucesso",
         "extracted_text": corrected_text,
         "words": words_objects,
         "course_name": course_name,
         "training_name": training_name,
         "date": date,
-        "duration": duration
+        "duration": duration,
+        "certificate_id": str(result.inserted_id)
     })
 
 def correct_spelling(text):
@@ -99,15 +119,18 @@ def correct_spelling(text):
     return text
 
 def extract_course_name(text):
-    match = re.search(r'(curso\s*"?([\w\s]+)"?)', text, re.IGNORECASE)
-    return match.group(2).strip() if match else None
+    # Exemplo de extração de nome do curso (pode ser ajustado conforme a necessidade)
+    match = re.search(r'(Curso|Curso de)\s*([\w\s]+)', text, re.IGNORECASE)
+    return match.group(2) if match else None
 
 def extract_training_name(text):
-    match = re.search(r'(treinamento\s*"?([\w\s]+)"?)', text, re.IGNORECASE)
-    return match.group(2).strip() if match else None
+    # Exemplo de extração do nome do treinamento
+    match = re.search(r'(Treinamento|Treinamento de)\s*([\w\s]+)', text, re.IGNORECASE)
+    return match.group(2) if match else None
 
 def extract_date(text):
-    match = re.search(r'(\d{2}[/-]\d{2}[/-]\d{4}|\d{4})', text)
+    # Exemplo de extração de data
+    match = re.search(r'(\d{2}/\d{2}/\d{4}|\d{4}-\d{2}-\d{2})', text)
     return match.group(0) if match else None
 
 def extract_duration_or_calculate(text):
@@ -178,7 +201,6 @@ def login():
 @app.route('/funcionarios', methods=['POST'])
 def create_funcionario():
     data = request.json
-    print(data)
 
     # Verificar se os campos obrigatórios estão presentes
     required_fields = ['nome', 'usuario', 'idade', 'email', 'tipo_funcionario']
@@ -210,9 +232,6 @@ def create_funcionario():
         }
     }
 
-
-    print(novo_funcionario)
-
     try:
         # Inserir o novo funcionário no banco de dados
         result = db.funcionarios.insert_one(novo_funcionario)
@@ -224,8 +243,15 @@ def create_funcionario():
 
 @app.route('/funcionarios', methods=['GET'])
 def get_funcionarios():
-    funcionarios = list(db.funcionarios.find({}, {'_id': 0}))
+    funcionarios = list(db.funcionarios.find({}))
+    
+    # Renomear o campo _id para id em cada documento
+    for funcionario in funcionarios:
+        funcionario['id'] = str(funcionario['_id'])  # Converte _id para string
+        del funcionario['_id']  # Remove o campo _id original
+    
     return jsonify(funcionarios), 200
+
 
 @app.route('/funcionarios/<string:nome>', methods=['GET'])
 def get_funcionario(nome):
