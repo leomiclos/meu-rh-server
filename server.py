@@ -211,6 +211,8 @@ def create_funcionario():
     }
 
 
+    print(novo_funcionario)
+
     try:
         # Inserir o novo funcionário no banco de dados
         result = db.funcionarios.insert_one(novo_funcionario)
