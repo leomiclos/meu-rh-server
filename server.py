@@ -195,10 +195,6 @@ def create_funcionario():
     senha = "12345"
     senha_hash = generate_password_hash(senha)
 
-    # Verificar o cargo
-    nome_cargo = data.get('nomeCargo')
-    cargo_salario = data.get('salario')
-
 
     novo_funcionario = {
         "nome": data.get('nome'),
@@ -209,10 +205,11 @@ def create_funcionario():
         "email": data.get('email'),
         "tipo_funcionario": data.get('tipo_funcionario'),
         "cargo": {
-            "nome_cargo": data.get('nomeCargo'),
-            "salario": data.get('salario')
+            "nome_cargo": data.get('cargo', {}).get('nome_cargo'),
+            "salario": data.get('cargo', {}).get('salario')
         }
     }
+
 
     try:
         # Inserir o novo funcionário no banco de dados
