@@ -16,8 +16,12 @@ from bson import ObjectId
 from spellchecker import SpellChecker
 
 # Configuração do pytesseract
-pt.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-
+tesseract_path = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+if os.path.exists(tesseract_path):
+    pt.pytesseract.tesseract_cmd = tesseract_path
+    print(f"Tesseract configurado com sucesso para: {tesseract_path}")
+else:
+    print(f"Erro: Não foi possível encontrar Tesseract em {tesseract_path}")
 # Inicializa o SpellChecker para português
 spell = SpellChecker(language='pt')
 
@@ -315,3 +319,38 @@ def delete_certificado(id):
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8000)
+
+
+
+
+
+
+
+def is_image_quality_acceptable(img):
+    """
+    Verifica se a imagem possui qualidade suficiente para OCR.
+    
+    Parâmetros:
+    - img: numpy array que representa a imagem (em BGR).
+
+    Retorna:
+    - bool: True se a imagem estiver suficientemente nítida, False caso contrário.
+    """
+    # Converte a imagem para escala de cinza
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    
+    # Calcula o Laplaciano da imagem em escala de cinza e a variância para avaliar nitidez
+    laplacian_var = cv2.Laplacian(gray, cv2.CV_64F).var()
+    
+    # Define o limiar de nitidez (ajustável conforme a necessidade)
+    SHARPNESS_THRESHOLD = 100
+    
+    # Retorna True se a variância do Laplaciano for maior que o limiar definido
+    return laplacian_var > SHARPNESS_THRESHOLD
+
+# Exemplo de uso:
+# img = cv2.imread('caminho/para/sua_imagem.jpg')
+# if is_image_quality_acceptable(img):
+#     print("Imagem de qualidade aceitável para OCR.")
+# else:
+#     print("Imagem com qualidade insuficiente para OCR.")
