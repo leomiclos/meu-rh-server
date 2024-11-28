@@ -26,13 +26,18 @@ import io
 
 
 # Configuração do pytesseract
-tesseract_path = '/usr/bin/tesseract'
-# tesseract_path = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-if os.path.exists(tesseract_path):
+if platform.system() == "Windows":
+    tesseract_path = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+else:  # Para Linux e outros sistemas
+    tesseract_path = "/usr/bin/tesseract"
+
+if os.path.exists(tesseract_path) or platform.system() != "Windows":
     pt.pytesseract.tesseract_cmd = tesseract_path
     print(f"Tesseract configurado com sucesso para: {tesseract_path}")
 else:
     print(f"Erro: Não foi possível encontrar Tesseract em {tesseract_path}")
+
+
 # Inicializa o SpellChecker para português
 spell = SpellChecker(language='pt')
 
