@@ -3,9 +3,6 @@
 # Atualiza o sistema
 apt-get update
 
-# Instala o Java
-apt-get install -y default-jre
-
 # Instala o Tesseract
 apt-get install -y tesseract-ocr
 

@@ -1,43 +1,46 @@
+# 1. Importações do sistema e utilitários gerais
 import os
 import re
 from datetime import datetime
 from io import BytesIO
+
+# 2. Bibliotecas de processamento de imagens e OCR
 import cv2
 import numpy as np
-import pytesseract as pt
-import cv2
 from PIL import Image
+import pytesseract as pt
 from pdf2image import convert_from_path
-from flask import Flask, request, jsonify, Response
+
+# 3. Frameworks e ferramentas para APIs
+from flask import Flask, request, jsonify, Response, send_from_directory
 from flask_cors import CORS
+
+# 4. Banco de dados e manipulação de objetos BSON
 from pymongo import MongoClient
-from werkzeug.security import generate_password_hash, check_password_hash
 from bson import ObjectId
-from spellchecker import SpellChecker
-from bson import Binary
-from base64 import b64encode
-import os
+
+# 5. Segurança e validação
+from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-from flask import send_from_directory
-import zlib
+
+# 6. Manipulação de texto
+from spellchecker import SpellChecker
+
+# 7. Codificação e manipulação de arquivos
 import base64
 import io
 
 
-
 # Configuração do pytesseract
-if platform.system() == "Windows":
-    tesseract_path = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-else:  # Para Linux e outros sistemas
-    tesseract_path = "/usr/bin/tesseract"
-
-if os.path.exists(tesseract_path) or platform.system() != "Windows":
+# tesseract_path = '/usr/bin/tesseract'
+tesseract_path = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+if os.path.exists(tesseract_path):
     pt.pytesseract.tesseract_cmd = tesseract_path
     print(f"Tesseract configurado com sucesso para: {tesseract_path}")
 else:
     print(f"Erro: Não foi possível encontrar Tesseract em {tesseract_path}")
 
-
+    
 # Inicializa o SpellChecker para português
 spell = SpellChecker(language='pt')
 
@@ -55,6 +58,7 @@ except Exception as e:
 
 db = client['meuRH']  # Nome do banco de dados
 certificates_collection = db['certificates']  # Coleção de certificados
+funcionarios = db['funcionarios']
 
 # Flask Configuration
 app = Flask(__name__)
@@ -91,12 +95,15 @@ def compress_image(photo):
 @app.route('/extract-text', methods=['POST'])
 def extract_text():
     if 'image' not in request.files:
-        return jsonify({"error": "Nenhuma imagem foi enviada"}), 400
+        return jsonify({"error": "Insira uma imagem"}), 400
 
     file = request.files['image']
+    user_id = request.form['user_id']
+    user_name = request.form['user_name']  # O nome do usuário será enviado diretamente pelo front-end
+
     file_extension = file.filename.split('.')[-1].lower()
 
-    print(f"Recebendo arquivo: {file.filename}, extensão: {file_extension}")
+    print(f"Recebendo arquivo: {file.filename}, extensão: {file_extension}, usuário: {user_name}")
 
     # Processamento da imagem para melhor qualidade
     def preprocess_image(image):
@@ -126,12 +133,14 @@ def extract_text():
     words = text.split()
     words_objects = [{"word": word} for word in words]
 
-    course_name = extract_course_name(text)
+    course_name = extract_course_name(text)  # Extrai o nome do curso
     date = extract_date(text)
     duration = extract_duration_or_calculate(text)
 
-    # Salvar os dados extraídos no banco de dados (coleção 'certificates')
+    # Dados do certificado
     certificate_data = {
+        "user_id": user_id,  # Salva o ID do usuário
+        "user_name": user_name,  # Salva o nome do usuário enviado pelo front-end
         "course_name": course_name,
         "date": date,
         "duration": duration,
@@ -145,27 +154,68 @@ def extract_text():
         print(f"Certificado salvo com ID: {result.inserted_id}")
 
         return jsonify({
-            "extracted_text": text,
-            "words": words_objects,
+            "user_name": user_name,
             "course_name": course_name,
             "date": date,
             "duration": duration,
+            "extracted_text": text,
+            "words": words_objects,
             "message": "Certificado salvo com sucesso!"
         }), 201
 
     except Exception as e:
         return jsonify({"error": f"Erro ao salvar certificado: {str(e)}"}), 500
 
+
+
 def extract_course_name(text):
-    # Expressão regular para capturar o nome do curso, que deve começar logo após palavras-chave como "Curso", "Workshop", etc.
-    match = re.search(r'(Curso|Treinamento|Workshop|Palestra|Seminário|Evento)[^0-9]*', text)
-    
+    # Tenta primeiro capturar texto entre aspas (incluindo casos com números no início)
+    course_name = extract_course_name_from_quotes(text)
+    if course_name:
+        return course_name
+
+    # Captura com base em palavras-chave e permite numerais no início
+    match = re.search(
+        r'(curso|treinamento|workshop|palestra|seminário|evento)\s*(?:“|")?[\dºª]*\s*[^0-9“"]+',
+        text,
+        re.IGNORECASE
+    )
     if match:
-        course_name = match.group(0).strip()  # Captura o nome do curso
-        # Elimina informações adicionais após o nome do curso (como patrocínios e datas)
+        course_name = match.group(0).strip()
+        # Remove sufixos irrelevantes e limpa o nome do curso
         course_name = re.sub(r' -.*| promovido.*| patrocínio.*| apoio.*| realizado.*| com.*', '', course_name)
         return course_name
+    
     return None
+
+
+
+
+def extract_course_name_from_quotes(text):
+    # Expressão regular para encontrar texto entre aspas (e números no início)
+    quotes_pattern = r'“([^“”]+)”|\"([^"]+)\"'
+
+    # Encontra todas as ocorrências de texto entre aspas
+    matches = re.findall(quotes_pattern, text)
+    
+    # Processa os textos encontrados entre aspas
+    for match in matches:
+        match_clean = ''.join(match).strip()  # Combina grupos e limpa espaços
+        if len(match_clean.split()) > 1:  # Certifica que o nome do curso tem mais de uma palavra
+            return match_clean
+    
+    return None
+
+
+
+
+def is_course_name(text):
+    # Função para verificar se o texto tem uma estrutura que possa ser um nome de curso
+    # Aqui você pode adicionar mais lógica para verificar a plausibilidade do nome do curso
+    # Por exemplo, um nome de curso normalmente é mais longo, tem mais de uma palavra, etc.
+    if len(text.split()) > 1:  # Um nome de curso geralmente tem mais de uma palavra
+        return True
+    return False
 
 
 def extract_date(text):
@@ -413,6 +463,36 @@ def get_funcionario(usuario):
         return jsonify(funcionario), 200
     else:
         return jsonify({'error': 'Funcionário não encontrado'}), 404
+    
+
+@app.route('/funcionarios/<string:user_id>', methods=['GET'])
+def get_funcionario_by_id(user_id):
+    try:
+        funcionario = funcionarios.find_one({"_id": ObjectId(user_id)})
+        if funcionario:
+            return jsonify(funcionario), 200
+        else:
+            return jsonify({'error': 'Funcionário não encontrado'}), 404
+    except Exception as e:
+        return jsonify({'error': f'Erro ao buscar funcionário: {str(e)}'}), 500  
+
+@app.route('/funcionarios', methods=['GET'])
+def get_funcionarios():
+    # Buscar todos os funcionários, excluindo os campos 'photo'
+    funcionarios = db.funcionarios.find({}, {'photo': 0})
+    
+    # Converter o cursor do MongoDB para uma lista e transformar ObjectId em string
+    funcionarios_list = []
+    for funcionario in funcionarios:
+        funcionario['_id'] = str(funcionario['_id'])  # Converte o ObjectId para string
+        funcionarios_list.append(funcionario)
+    
+    if funcionarios_list:
+        return jsonify(funcionarios_list), 200
+    else:
+        return jsonify({'error': 'Nenhum funcionário encontrado'}), 404
+
+
 
 
 @app.route('/funcionarios/<string:usuario>', methods=['PUT'])
