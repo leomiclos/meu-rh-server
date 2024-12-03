@@ -32,8 +32,8 @@ import io
 
 
 # Configuração do pytesseract
-# tesseract_path = '/usr/bin/tesseract'
-tesseract_path = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+tesseract_path = '/usr/bin/tesseract'
+# tesseract_path = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 if os.path.exists(tesseract_path):
     pt.pytesseract.tesseract_cmd = tesseract_path
     print(f"Tesseract configurado com sucesso para: {tesseract_path}")
