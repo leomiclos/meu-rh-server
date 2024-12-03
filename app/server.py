@@ -23,8 +23,6 @@ from bson import ObjectId
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 
-# 6. Manipulação de texto
-from spellchecker import SpellChecker
 
 # 7. Codificação e manipulação de arquivos
 import base64
@@ -39,10 +37,6 @@ if os.path.exists(tesseract_path):
     print(f"Tesseract configurado com sucesso para: {tesseract_path}")
 else:
     print(f"Erro: Não foi possível encontrar Tesseract em {tesseract_path}")
-
-
-# Inicializa o SpellChecker para português
-spell = SpellChecker(language="pt")
 
 
 # Configuração do MongoDB
@@ -68,10 +62,6 @@ CORS(app)  # Permite requisições CORS
 SAVE_DIR = "C:/Users/leomi/OneDrive/Área de Trabalho/Faculdade Leo/aplicativo-tcc/img"
 if not os.path.exists(SAVE_DIR):
     os.makedirs(SAVE_DIR)
-
-# Inicializando o spellchecker
-spell = SpellChecker()
-
 
 @app.route("/extract-text", methods=["POST"])
 def extract_text():
