@@ -31,8 +31,8 @@ import base64
 import io
 
 # Configuração do pytesseract
-tesseract_path = '/usr/bin/tesseract'
-# tesseract_path = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+#tesseract_path = '/usr/bin/tesseract'
+tesseract_path = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 if os.path.exists(tesseract_path):
     pt.pytesseract.tesseract_cmd = tesseract_path
     print(f"Tesseract configurado com sucesso para: {tesseract_path}")
@@ -323,13 +323,13 @@ def save_photo(photo):
 @app.route('/login', methods=['POST'])
 def login():
     data = request.json
-    
+    print(data)
+
     usuario = data.get('usuario')
     senha = data.get('senha')
-    
+
     if not usuario or not senha:
         return jsonify({'error': 'Nome de usuário e senha são obrigatórios.'}), 400
-
     try:
         funcionario = db.funcionarios.find_one({'usuario': usuario})
 
