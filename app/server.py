@@ -30,7 +30,6 @@ from spellchecker import SpellChecker
 import base64
 import io
 
-
 # Configuração do pytesseract
 tesseract_path = '/usr/bin/tesseract'
 # tesseract_path = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
@@ -43,7 +42,6 @@ else:
     
 # Inicializa o SpellChecker para português
 spell = SpellChecker(language='pt')
-
 
 # Configuração do MongoDB
 uri = "mongodb+srv://leonardormiclos:leonardo2024@meurh.wddun.mongodb.net/?retryWrites=true&w=majority&appName=meuRH"
@@ -68,9 +66,6 @@ CORS(app)  # Permite requisições CORS
 SAVE_DIR = 'C:/Users/leomi/OneDrive/Área de Trabalho/Faculdade Leo/aplicativo-tcc/img'
 if not os.path.exists(SAVE_DIR):
     os.makedirs(SAVE_DIR)
-
-# Inicializando o spellchecker
-spell = SpellChecker()
 
 def compress_image(photo):
     try:
@@ -130,9 +125,6 @@ def extract_text():
     # Corrigir a formatação do texto extraído
     text = text.replace('\n', ' ').replace('\r', '')  # Remove quebras de linha
 
-    words = text.split()
-    words_objects = [{"word": word} for word in words]
-
     course_name = extract_course_name(text)  # Extrai o nome do curso
     date = extract_date(text)
     duration = extract_duration_or_calculate(text)
@@ -165,7 +157,6 @@ def extract_text():
         return jsonify({"error": f"Erro ao salvar certificado: {str(e)}"}), 500
 
 
-
 def extract_course_name(text):
     # Tenta primeiro capturar texto entre aspas (incluindo casos com números no início)
     course_name = extract_course_name_from_quotes(text)
@@ -185,8 +176,6 @@ def extract_course_name(text):
         return course_name
     
     return None
-
-
 
 
 def extract_course_name_from_quotes(text):
@@ -345,7 +334,7 @@ def login():
         funcionario = db.funcionarios.find_one({'usuario': usuario})
 
         if funcionario:
-            if check_password_hash(funcionario['senha'], str(senha)):
+            if funcionario['senha'] == str(senha):
                 funcionario.pop('senha', None) 
                 funcionario.pop('photo', None) 
                 funcionario = serialize(funcionario)
@@ -384,18 +373,15 @@ def create_funcionario():
         return jsonify({'error': 'Formato de imagem inválido. Apenas PNG, JPG e JPEG são permitidos.'}), 400
 
 
-        
-
     # Definir a senha como "12345" para todos os novos usuários
     senha = "12345"
-    senha_hash = generate_password_hash(senha)
 
     novo_funcionario = {
         "nome": data.get('nome'),
         "usuario": data.get('usuario'),
         "photo": photo_path,  # Salva o caminho da foto
         "idade": data.get('idade'),
-        "senha": senha_hash,
+        "senha": senha,
         "email": data.get('email'),
         "tipo_funcionario": data.get('tipo_funcionario'),
         "cargo": {
@@ -411,7 +397,6 @@ def create_funcionario():
     except Exception as e:
         # Em caso de erro na inserção
         return jsonify({'error': f'Erro ao criar funcionário: {str(e)}'}), 500
-
 
 @app.route('/funcionarios/<string:usuario>/imagem', methods=['GET'])
 def get_photo(usuario):
@@ -459,7 +444,6 @@ def get_funcionario(usuario):
         return jsonify(funcionario), 200
     else:
         return jsonify({'error': 'Funcionário não encontrado'}), 404
-    
 
 @app.route('/funcionarios/<string:user_id>', methods=['GET'])
 def get_funcionario_by_id(user_id):
@@ -487,8 +471,6 @@ def get_funcionarios():
         return jsonify(funcionarios_list), 200
     else:
         return jsonify({'error': 'Nenhum funcionário encontrado'}), 404
-
-
 
 
 @app.route('/funcionarios/<string:usuario>', methods=['PUT'])
