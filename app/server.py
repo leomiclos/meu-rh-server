@@ -32,13 +32,18 @@ import io
 
 
 # Configuração do pytesseract
-# tesseract_path = '/usr/bin/tesseract'
-tesseract_path = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+tesseract_path = '/usr/bin/tesseract'
+# tesseract_path = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 if os.path.exists(tesseract_path):
     pt.pytesseract.tesseract_cmd = tesseract_path
     print(f"Tesseract configurado com sucesso para: {tesseract_path}")
 else:
     print(f"Erro: Não foi possível encontrar Tesseract em {tesseract_path}")
+
+    
+# Inicializa o SpellChecker para português
+spell = SpellChecker(language='pt')
+
 
 # Configuração do MongoDB
 uri = "mongodb+srv://leonardormiclos:leonardo2024@meurh.wddun.mongodb.net/?retryWrites=true&w=majority&appName=meuRH"
@@ -140,7 +145,6 @@ def extract_text():
         "date": date,
         "duration": duration,
         "extracted_text": text,
-        "words": words_objects
     }
 
     try:
@@ -154,7 +158,6 @@ def extract_text():
             "date": date,
             "duration": duration,
             "extracted_text": text,
-            "words": words_objects,
             "message": "Certificado salvo com sucesso!"
         }), 201
 
