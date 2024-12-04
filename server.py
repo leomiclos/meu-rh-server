@@ -17,11 +17,10 @@ from flask_cors import CORS
 
 # 4. Banco de dados e manipulação de objetos BSON
 from pymongo import MongoClient
-from bson import ObjectId
+from bson import ObjectId, Binary
 
 # 5. Segurança e validação
-from werkzeug.security import generate_password_hash, check_password_hash
-from werkzeug.utils import secure_filename
+from werkzeug.datastructures import FileStorage
 
 # 6. Manipulação de texto
 from spellchecker import SpellChecker
@@ -32,8 +31,8 @@ import io
 
 
 # Configuração do pytesseract
-# tesseract_path = '/usr/bin/tesseract'
-# tesseract_path = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+#tesseract_path = '/usr/bin/tesseract'
+tesseract_path = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 if os.path.exists(tesseract_path):
     pt.pytesseract.tesseract_cmd = tesseract_path
     print(f"Tesseract configurado com sucesso para: {tesseract_path}")
@@ -43,7 +42,6 @@ else:
     
 # Inicializa o SpellChecker para português
 spell = SpellChecker(language='pt')
-
 
 # Configuração do MongoDB
 uri = "mongodb+srv://leonardormiclos:leonardo2024@meurh.wddun.mongodb.net/?retryWrites=true&w=majority&appName=meuRH"
@@ -68,9 +66,6 @@ CORS(app)  # Permite requisições CORS
 SAVE_DIR = 'C:/Users/leomi/OneDrive/Área de Trabalho/Faculdade Leo/aplicativo-tcc/img'
 if not os.path.exists(SAVE_DIR):
     os.makedirs(SAVE_DIR)
-
-# Inicializando o spellchecker
-spell = SpellChecker()
 
 def compress_image(photo):
     try:
@@ -130,9 +125,6 @@ def extract_text():
     # Corrigir a formatação do texto extraído
     text = text.replace('\n', ' ').replace('\r', '')  # Remove quebras de linha
 
-    words = text.split()
-    words_objects = [{"word": word} for word in words]
-
     course_name = extract_course_name(text)  # Extrai o nome do curso
     date = extract_date(text)
     duration = extract_duration_or_calculate(text)
@@ -145,7 +137,6 @@ def extract_text():
         "date": date,
         "duration": duration,
         "extracted_text": text,
-        "words": words_objects
     }
 
     try:
@@ -159,13 +150,11 @@ def extract_text():
             "date": date,
             "duration": duration,
             "extracted_text": text,
-            "words": words_objects,
             "message": "Certificado salvo com sucesso!"
         }), 201
 
     except Exception as e:
         return jsonify({"error": f"Erro ao salvar certificado: {str(e)}"}), 500
-
 
 
 def extract_course_name(text):
@@ -187,8 +176,6 @@ def extract_course_name(text):
         return course_name
     
     return None
-
-
 
 
 def extract_course_name_from_quotes(text):
@@ -311,43 +298,25 @@ def serialize(funcionario):
             'nome_cargo': funcionario.get('cargo', {}).get('nome_cargo', ''),
             'salario': funcionario.get('cargo', {}).get('salario', '')
         },
-        'photo': funcionario.get('photo', None)
+        'photo': funcionario.get('photo', None)  
     }
 
-
-
-# Diretório onde as imagens dos funcionários serão salvas
-UPLOAD_FOLDER = 'C:/Users/leomi/OneDrive/Área de Trabalho/Faculdade Leo/aplicativo-tcc/meu-rh-servidor/img'
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
-
-# Função para verificar se a extensão da imagem é permitida
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
-# Função para salvar a foto no diretório
-def save_photo(photo):
-    if photo and allowed_file(photo.filename):
-        filename = secure_filename(photo.filename)  # Garante um nome seguro para o arquivo
-        filepath = os.path.join(UPLOAD_FOLDER, filename)  # Caminho completo para o diretório
-        photo.save(filepath)  # Salva a foto no diretório
-        return filepath  # Retorna o caminho onde a foto foi salva
-    return None  # Retorna None se o arquivo não for válido
 
 @app.route('/login', methods=['POST'])
 def login():
     data = request.json
-    
+    print(data)
+
     usuario = data.get('usuario')
     senha = data.get('senha')
-    
+
     if not usuario or not senha:
         return jsonify({'error': 'Nome de usuário e senha são obrigatórios.'}), 400
-
     try:
         funcionario = db.funcionarios.find_one({'usuario': usuario})
 
         if funcionario:
-            if check_password_hash(funcionario['senha'], str(senha)):
+            if funcionario['senha'] == str(senha):
                 funcionario.pop('senha', None) 
                 funcionario.pop('photo', None) 
                 funcionario = serialize(funcionario)
@@ -376,28 +345,14 @@ def create_funcionario():
     if usuario_existente:
         return jsonify({'error': 'Usuário já existe.'}), 400
 
-    # Recebe a foto do funcionário
-    if 'photo' not in request.files:
-        return jsonify({'error': 'Foto do funcionário é obrigatória.'}), 400
-
-    photo = request.files['photo']
-    photo_path = compress_hash_base64(photo)  # Salva a foto e obtém o caminho
-    if not photo_path:
-        return jsonify({'error': 'Formato de imagem inválido. Apenas PNG, JPG e JPEG são permitidos.'}), 400
-
-
-        
-
     # Definir a senha como "12345" para todos os novos usuários
     senha = "12345"
-    senha_hash = generate_password_hash(senha)
 
     novo_funcionario = {
         "nome": data.get('nome'),
         "usuario": data.get('usuario'),
-        "photo": photo_path,  # Salva o caminho da foto
         "idade": data.get('idade'),
-        "senha": senha_hash,
+        "senha": senha,
         "email": data.get('email'),
         "tipo_funcionario": data.get('tipo_funcionario'),
         "cargo": {
@@ -413,6 +368,7 @@ def create_funcionario():
     except Exception as e:
         # Em caso de erro na inserção
         return jsonify({'error': f'Erro ao criar funcionário: {str(e)}'}), 500
+
 
 
 @app.route('/funcionarios/<string:usuario>/imagem', methods=['GET'])
@@ -461,7 +417,6 @@ def get_funcionario(usuario):
         return jsonify(funcionario), 200
     else:
         return jsonify({'error': 'Funcionário não encontrado'}), 404
-    
 
 @app.route('/funcionarios/<string:user_id>', methods=['GET'])
 def get_funcionario_by_id(user_id):
@@ -491,8 +446,6 @@ def get_funcionarios():
         return jsonify({'error': 'Nenhum funcionário encontrado'}), 404
 
 
-
-
 @app.route('/funcionarios/<string:usuario>', methods=['PUT'])
 def update_funcionario(usuario):
     # Buscar o funcionário pelo nome de usuário
@@ -502,7 +455,7 @@ def update_funcionario(usuario):
         return jsonify({'error': 'Funcionário não encontrado.'}), 404
 
     # Dados recebidos para atualização (usuário pode estar enviando um JSON)
-    data = request.form  # Usando request.form para pegar dados de 'multipart/form-data'
+    data = request.json  # Usando request.json para pegar dados no formato JSON
     
     # Verificar se os campos obrigatórios para atualização estão presentes
     required_fields = ['nome', 'usuario', 'idade', 'email', 'tipo_funcionario']
@@ -523,32 +476,13 @@ def update_funcionario(usuario):
         }
     }
 
-    # Atualizar a foto, se fornecida
-    if 'photo' in request.files:
-        photo = request.files['photo']
-        
-        if isinstance(photo, FileStorage):  # Certificando-se de que o 'photo' é um arquivo válido
-            try:
-                # Comprimir a imagem recebida
-                compressed_photo = compress_image(photo)
-
-                # Converter a imagem comprimida para base64
-                buffered = BytesIO(compressed_photo)
-                img_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')  # Converter para base64
-
-                # Salvar o base64 da imagem no campo 'photo'
-                updated_data["photo"] = img_base64
-            except Exception as e:
-                return jsonify({'error': f'Erro ao processar a foto: {str(e)}'}), 400
-        else:
-            return jsonify({'error': 'Formato de imagem inválido.'}), 400
-
     # Atualizar o funcionário no banco de dados
     try:
         db.funcionarios.update_one({'usuario': usuario}, {'$set': updated_data})
         return jsonify({'message': 'Funcionário atualizado com sucesso.'}), 200
     except Exception as e:
         return jsonify({'error': f'Erro ao atualizar funcionário: {str(e)}'}), 500
+
 
 
 @app.route('/funcionarios/<string:nome>', methods=['DELETE'])
@@ -558,21 +492,14 @@ def delete_funcionario(nome):
         return jsonify({'message': 'Funcionário deletado com sucesso'}), 200
     return jsonify({'error': 'Funcionário não encontrado'}), 404
 
-# Rotas CRUD para Certificados
-@app.route('/certificados', methods=['POST'])
-def create_certificado():
-    data = request.json
-    result = db.certificados.insert_one(data)
-    return jsonify({'id': str(result.inserted_id)}), 201
-
 @app.route('/certificados', methods=['GET'])
 def get_certificados():
-    certificados = list(db.certificados.find({}, {'_id': 0}))
+    certificados = list(db.certificates.find({}, {'_id': 0}))
     return jsonify(certificados), 200
 
 @app.route('/certificados/<string:id>', methods=['GET'])
 def get_certificado(id):
-    certificado = db.certificados.find_one({'_id': ObjectId(id)}, {'_id': 0})
+    certificado = db.certificates.find_one({'_id': ObjectId(id)}, {'_id': 0})
     if certificado:
         return jsonify(certificado), 200
     return jsonify({'error': 'Certificado não encontrado'}), 404
@@ -580,7 +507,7 @@ def get_certificado(id):
 @app.route('/certificados/<string:id>', methods=['PUT'])
 def update_certificado(id):
     data = request.json
-    result = db.certificados.update_one({'_id': ObjectId(id)}, {'$set': data})
+    result = db.certificates.update_one({'_id': ObjectId(id)}, {'$set': data})
 
     if result.matched_count > 0:
         return jsonify({'message': 'Certificado atualizado com sucesso'}), 200
@@ -589,10 +516,27 @@ def update_certificado(id):
 
 @app.route('/certificados/<string:id>', methods=['DELETE'])
 def delete_certificado(id):
-    result = db.certificados.delete_one({'_id': ObjectId(id)})
-    if result.deleted_count > 0:
-        return jsonify({'message': 'Certificado deletado com sucesso'}), 200
-    return jsonify({'error': 'Certificado não encontrado'}), 404
+    try:
+        # Converte o ID recebido para ObjectId
+        object_id = ObjectId(id)        
+        # Buscar o certificado pelo ID
+        certificado_a_deletar = db.certificates.find_one({'_id': object_id})
+        
+        if certificado_a_deletar:
+            result = db.certificates.delete_one({'_id': object_id})
+            if result.deleted_count > 0:
+                return jsonify({'message': 'Certificado deletado com sucesso'}), 200
+            else:
+                return jsonify({'error': 'Erro ao tentar deletar certificado'}), 500
+        else:
+            # Log para quando o certificado não for encontrado
+            return jsonify({'error': 'Certificado não encontrado'}), 404
+    except Exception as e:
+        # Log para capturar exceções
+        print(f"Erro ao deletar certificado: {str(e)}")
+        return jsonify({'error': str(e)}), 400
+
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8000)
