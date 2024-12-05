@@ -237,15 +237,21 @@ def verifyIsOn():
     return "API Online"
 
 # Função para listar certificados por ID de usuário
-@app.route('/certificados/funcionario/<string:user_id>', methods=['GET'])
-def listar_certificados_por_funcionario(user_id):
+@app.route('/certificados/funcionario/<string:user_name>', methods=['GET'])
+def listar_certificados_por_funcionario(user_name):
     try:
-        certificados = list(db.certificates.find({'user_id': user_id}, {'_id': 0}))  # Filtra por funcionario_id
+        # Busca certificados pelo user_id como string
+        certificados = list(db.certificates.find({'user_name': user_name}, {'_id': 0}))
+        
         if certificados:
             return jsonify(certificados), 200
+        
         return jsonify({'error': 'Nenhum certificado encontrado para este funcionário.'}), 404
+    
     except Exception as e:
+        print(f"Erro ao buscar certificados para user_name {user_name}: {e}")
         return jsonify({'error': f'Erro ao obter certificados: {str(e)}'}), 500
+
 
 
 # Função para editar um certificado
