@@ -236,55 +236,7 @@ def extract_duration_or_calculate(text):
 def verifyIsOn():
     return "API Online"
 
-# Função para listar certificados por ID de usuário
-@app.route('/certificados/funcionario/<string:user_name>', methods=['GET'])
-def listar_certificados_por_funcionario(user_name):
-    try:
-        # Busca certificados pelo user_id como string
-        certificados = list(db.certificates.find({'user_name': user_name}, {'_id': 0}))
-        
-        if certificados:
-            return jsonify(certificados), 200
-        
-        return jsonify({'error': 'Nenhum certificado encontrado para este funcionário.'}), 404
-    
-    except Exception as e:
-        print(f"Erro ao buscar certificados para user_name {user_name}: {e}")
-        return jsonify({'error': f'Erro ao obter certificados: {str(e)}'}), 500
 
-
-
-# Função para editar um certificado
-@app.route('/certificados/<string:id>', methods=['PUT'])
-def editar_certificado(id):
-    data = request.json  # Dados para atualização
-    
-    # Atualizando o certificado
-    try:
-        result = db.certificates.update_one(
-            {'_id': ObjectId(id)},  # Filtra pelo id do certificado
-            {'$set': data}  # Atualiza os dados
-        )
-        
-        if result.matched_count > 0:
-            return jsonify({'message': 'Certificado atualizado com sucesso'}), 200
-        else:
-            return jsonify({'error': 'Certificado não encontrado'}), 404
-    except Exception as e:
-        return jsonify({'error': f'Erro ao atualizar certificado: {str(e)}'}), 500
-
-
-@app.route('/certificados', methods=['GET'])
-def listar_certificados():
-    try:
-        # Busca todos os certificados na coleção 'certificates'
-        certificates = list(db.certificates.find())
-        # Converte o campo '_id' para string
-        for certificate in certificates:
-            certificate['_id'] = str(certificate['_id'])
-        return jsonify(certificates), 200  # Retorna a lista de certificados
-    except Exception as e:
-        return jsonify({'error': f'Erro ao obter certificados: {str(e)}'}), 500
 
 
 def serialize(funcionario):
@@ -493,10 +445,67 @@ def delete_funcionario(nome):
         return jsonify({'message': 'Funcionário deletado com sucesso'}), 200
     return jsonify({'error': 'Funcionário não encontrado'}), 404
 
+
+
+
+@app.route('/certificados/funcionario/<string:user_name>', methods=['GET'])
+def listar_certificados_por_funcionario(user_name):
+    try:
+        # Busca certificados pelo user_name como string
+        certificados = list(db.certificates.find({'user_name': user_name}))
+        
+        # Verifica se há certificados
+        if certificados:
+            # Adiciona o _id de cada certificado convertendo para string para garantir que seja serializável
+            for certificado in certificados:
+                certificado['_id'] = str(certificado['_id'])  # Converte o _id para string
+                
+            return jsonify(certificados), 200
+        
+        return jsonify({'error': 'Nenhum certificado encontrado para este funcionário.'}), 404
+    
+    except Exception as e:
+        print(f"Erro ao buscar certificados para user_name {user_name}: {e}")
+        return jsonify({'error': f'Erro ao obter certificados: {str(e)}'}), 500
+
+
+
+# Função para editar um certificado
+@app.route('/certificados/<string:id>', methods=['PUT'])
+def editar_certificado(id):
+    data = request.json  # Dados para atualização
+    
+    # Atualizando o certificado
+    try:
+        result = db.certificates.update_one(
+            {'_id': ObjectId(id)},  # Filtra pelo id do certificado
+            {'$set': data}  # Atualiza os dados
+        )
+        
+        if result.matched_count > 0:
+            return jsonify({'message': 'Certificado atualizado com sucesso'}), 200
+        else:
+            return jsonify({'error': 'Certificado não encontrado'}), 404
+    except Exception as e:
+        return jsonify({'error': f'Erro ao atualizar certificado: {str(e)}'}), 500
+
+
 @app.route('/certificados', methods=['GET'])
-def get_certificados():
-    certificados = list(db.certificates.find({}, {'_id': 0}))
-    return jsonify(certificados), 200
+def listar_certificados():
+    try:
+        # Busca todos os certificados na coleção 'certificates'
+        certificates = list(db.certificates.find())
+        # Converte o campo '_id' para string
+        for certificate in certificates:
+            certificate['_id'] = str(certificate['_id'])
+        return jsonify(certificates), 200  # Retorna a lista de certificados
+    except Exception as e:
+        return jsonify({'error': f'Erro ao obter certificados: {str(e)}'}), 500
+
+# @app.route('/certificados', methods=['GET'])
+# def get_certificados():
+#     certificados = list(db.certificates.find({}, {'_id': 0}))
+#     return jsonify(certificados), 200
 
 @app.route('/certificados/<string:id>', methods=['GET'])
 def get_certificado(id):
