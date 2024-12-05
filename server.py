@@ -236,16 +236,11 @@ def extract_duration_or_calculate(text):
 def verifyIsOn():
     return "API Online"
 
-@app.route('/uploads/<filename>')
-def uploaded_file(filename):
-    return send_from_directory(UPLOAD_FOLDER, filename)
-
-
 # Função para listar certificados por ID de usuário
-@app.route('/certificados/funcionario/<string:funcionario_id>', methods=['GET'])
-def listar_certificados_por_funcionario(funcionario_id):
+@app.route('/certificados/funcionario/<string:user_id>', methods=['GET'])
+def listar_certificados_por_funcionario(user_id):
     try:
-        certificados = list(db.certificados.find({'funcionario_id': ObjectId(funcionario_id)}, {'_id': 0}))  # Filtra por funcionario_id
+        certificados = list(db.certificates.find({'user_id': user_id}, {'_id': 0}))  # Filtra por funcionario_id
         if certificados:
             return jsonify(certificados), 200
         return jsonify({'error': 'Nenhum certificado encontrado para este funcionário.'}), 404
@@ -260,7 +255,7 @@ def editar_certificado(id):
     
     # Atualizando o certificado
     try:
-        result = db.certificados.update_one(
+        result = db.certificates.update_one(
             {'_id': ObjectId(id)},  # Filtra pelo id do certificado
             {'$set': data}  # Atualiza os dados
         )
